@@ -26,26 +26,59 @@
             <artifactId>server</artifactId>
             <version>0.1.25-SNAPSHOT</version>
         </dependency>
+
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-netty</artifactId>
+            <version>${grpc.version}</version>
+        </dependency>
     </dependencies>
 
     <build>
         <plugins>
+<!--            <plugin>-->
+<!--                <groupId>org.jacoco</groupId>-->
+<!--                <artifactId>jacoco-maven-plugin</artifactId>-->
+<!--                <version>${jacoco-maven-plugin.version}</version>-->
+<!--                <executions>-->
+<!--                    <execution>-->
+<!--                        <id>jacoco-aggregate-report</id>-->
+<!--                        <goals>-->
+<!--                            <goal>report-aggregate</goal>-->
+<!--                        </goals>-->
+<!--                        <phase>verify</phase>-->
+<!--                        <configuration>-->
+<!--                            <excludes>-->
+<!--                                <exclude>**/AutoValue_*.class</exclude>-->
+<!--                            </excludes>-->
+<!--                        </configuration>-->
+<!--                    </execution>-->
+<!--                </executions>-->
+<!--            </plugin>-->
             <plugin>
-                <groupId>org.jacoco</groupId>
-                <artifactId>jacoco-maven-plugin</artifactId>
-                <version>${jacoco-maven-plugin.version}</version>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>2.4.1</version>
+                <configuration>
+                    <!-- get all project dependencies -->
+                    <descriptorRefs>
+                        <descriptorRef>jar-with-dependencies</descriptorRef>
+                    </descriptorRefs>
+                    <!-- MainClass in mainfest make a executable jar -->
+                    <archive>
+                        <manifest>
+                            <mainClass>io.envoyproxy.controlplane.server.TestXdsServer</mainClass>
+                        </manifest>
+                    </archive>
+                </configuration>
                 <executions>
                     <execution>
-                        <id>jacoco-aggregate-report</id>
+                        <id>make-assembly</id>
+                        <!-- bind to the packaging phase -->
+                        <phase>package</phase>
                         <goals>
-                            <goal>report-aggregate</goal>
+                            <goal>single</goal>
                         </goals>
-                        <phase>verify</phase>
-                        <configuration>
-                            <excludes>
-                                <exclude>**/AutoValue_*.class</exclude>
-                            </excludes>
-                        </configuration>
                     </execution>
                 </executions>
             </plugin>
