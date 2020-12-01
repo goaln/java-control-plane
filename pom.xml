@@ -132,7 +132,8 @@
                             <encoding>UTF-8</encoding>
                             <failOnViolation>true</failOnViolation>
                             <includeTestSourceDirectory>true</includeTestSourceDirectory>
-                            <violationSeverity>warning</violationSeverity>
+<!--                            <violationSeverity>warning</violationSeverity>-->
+                            <violationSeverity>error</violationSeverity>
                         </configuration>
                         <goals>
                             <goal>check</goal>

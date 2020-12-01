@@ -3,13 +3,11 @@ package io.envoyproxy.controlplane.server;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.Duration;
 import io.envoyproxy.controlplane.cache.NodeGroup;
+import io.envoyproxy.controlplane.cache.TestResources;
 import io.envoyproxy.controlplane.cache.v2.SimpleCache;
 import io.envoyproxy.controlplane.cache.v2.Snapshot;
 import io.envoyproxy.envoy.api.v2.Cluster;
-import io.envoyproxy.envoy.api.v2.Cluster.DiscoveryType;
-import io.envoyproxy.envoy.api.v2.core.Address;
 import io.envoyproxy.envoy.api.v2.core.Node;
-import io.envoyproxy.envoy.api.v2.core.SocketAddress;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.netty.NettyServerBuilder;
@@ -27,7 +25,7 @@ public class TestXdsServer {
    * @param arg command-line args
    */
   public static void main(String[] arg) throws IOException, InterruptedException {
-    SimpleCache<String> cache = new SimpleCache<>(new NodeGroup<String>() {
+    io.envoyproxy.controlplane.cache.v2.SimpleCache<String> cache = new SimpleCache<>(new NodeGroup<String>() {
       @Override public String hash(Node node) {
         return GROUP;
       }
@@ -39,16 +37,14 @@ public class TestXdsServer {
 
     cache.setSnapshot(
         GROUP,
-        Snapshot.create(
+        io.envoyproxy.controlplane.cache.v2.Snapshot.create(
             ImmutableList.of(
-                Cluster.newBuilder()
+                io.envoyproxy.envoy.api.v2.Cluster.newBuilder()
                     .setName("cluster0")
                     .setConnectTimeout(Duration.newBuilder().setSeconds(5))
-                    .setType(DiscoveryType.STATIC)
-                    .addHosts(Address.newBuilder()
-                        .setSocketAddress(SocketAddress.newBuilder().setAddress("127.0.0.1").setPortValue(1234)))
+                    .setType(io.envoyproxy.envoy.api.v2.Cluster.DiscoveryType.STATIC)
                     .build()),
-            ImmutableList.of(),
+            ImmutableList.of(TestResources.createEndpoint("cluster0", "127.0.0.1", 1234)),
             ImmutableList.of(),
             ImmutableList.of(),
             ImmutableList.of(),
@@ -86,11 +82,9 @@ public class TestXdsServer {
                 Cluster.newBuilder()
                     .setName("cluster1")
                     .setConnectTimeout(Duration.newBuilder().setSeconds(5))
-                    .setType(DiscoveryType.STATIC)
-                    .addHosts(Address.newBuilder()
-                        .setSocketAddress(SocketAddress.newBuilder().setAddress("127.0.0.1").setPortValue(1235)))
+                    .setType(Cluster.DiscoveryType.STATIC)
                     .build()),
-            ImmutableList.of(),
+            ImmutableList.of(TestResources.createEndpoint("cluster1", "127.0.0.1", 1235)),
             ImmutableList.of(),
             ImmutableList.of(),
             ImmutableList.of(),
