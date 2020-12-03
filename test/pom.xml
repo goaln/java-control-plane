@@ -32,6 +32,12 @@
             <artifactId>grpc-netty</artifactId>
             <version>${grpc.version}</version>
         </dependency>
+
+        <dependency>
+            <groupId>com.orbitz.consul</groupId>
+            <artifactId>consul-client</artifactId>
+            <version>1.4.2</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -67,7 +73,7 @@
                     <!-- MainClass in mainfest make a executable jar -->
                     <archive>
                         <manifest>
-                            <mainClass>io.envoyproxy.controlplane.server.TestXdsServer</mainClass>
+                            <mainClass>io.envoyproxy.controlplane.server.ConsulXdsServerV3</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
