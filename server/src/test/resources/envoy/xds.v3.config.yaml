@@ -38,3 +38,16 @@ static_resources:
                     socket_address:
                       address: 127.0.0.1
                       port_value: 12345
+    - name: zipkin
+      connect_timeout: 1s
+      type: strict_dns
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: zipkin
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: ifp3-dev1
+                      port_value: 9411

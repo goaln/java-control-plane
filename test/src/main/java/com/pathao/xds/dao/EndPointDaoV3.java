@@ -1,11 +1,14 @@
 package com.pathao.xds.dao;
 
 import com.google.protobuf.Any;
+import com.google.protobuf.BoolValue;
 import com.google.protobuf.Duration;
 import com.orbitz.consul.AgentClient;
 import com.pathao.xds.dto.ClusterDto;
 import io.envoyproxy.envoy.config.cluster.v3.Cluster;
 import io.envoyproxy.envoy.config.core.v3.Address;
+import io.envoyproxy.envoy.config.core.v3.HeaderValue;
+import io.envoyproxy.envoy.config.core.v3.HeaderValueOption;
 import io.envoyproxy.envoy.config.core.v3.SocketAddress;
 import io.envoyproxy.envoy.config.endpoint.v3.ClusterLoadAssignment;
 import io.envoyproxy.envoy.config.endpoint.v3.Endpoint;
@@ -15,6 +18,8 @@ import io.envoyproxy.envoy.config.listener.v3.Filter;
 import io.envoyproxy.envoy.config.listener.v3.FilterChain;
 import io.envoyproxy.envoy.config.listener.v3.Listener;
 import io.envoyproxy.envoy.config.route.v3.*;
+import io.envoyproxy.envoy.config.trace.v3.Tracing;
+import io.envoyproxy.envoy.config.trace.v3.ZipkinConfig;
 import io.envoyproxy.envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager;
 import io.envoyproxy.envoy.extensions.filters.network.http_connection_manager.v3.HttpFilter;
 
@@ -41,6 +46,7 @@ public class EndPointDaoV3 {
       }
       clusterDtoMap.get(clusterDto.name).add(clusterDto);
     });
+
     return clusterDtoMap.keySet().stream().map(key -> {
       List<LocalityLbEndpoints> endpointList = clusterDtoMap.get(key).stream().map(clusterDto -> {
         return LocalityLbEndpoints.newBuilder().addLbEndpoints(LbEndpoint.newBuilder()
@@ -51,6 +57,7 @@ public class EndPointDaoV3 {
                         .setPortValue(clusterDto.port)
                         .setProtocol(SocketAddress.Protocol.TCP))))).build();
       }).collect(toList());
+
       return ClusterLoadAssignment.newBuilder()
           .setClusterName(key)
           .addAllEndpoints(endpointList)
@@ -70,12 +77,23 @@ public class EndPointDaoV3 {
   }
 
   public Listener getListener(List<Cluster> clusters){
+    ZipkinConfig zipkinConfig =ZipkinConfig.newBuilder()
+                .setCollectorCluster("zipkin")
+                .setCollectorEndpoint("/api/v2/spans")
+                .setCollectorEndpointVersion(ZipkinConfig.CollectorEndpointVersion.HTTP_JSON).build();
+
     HttpConnectionManager manager = HttpConnectionManager.newBuilder()
         .setCodecType(HttpConnectionManager.CodecType.AUTO)
         .setStatPrefix("http")
+        .setGenerateRequestId(BoolValue.of(true))
+        .setTracing(HttpConnectionManager.Tracing.newBuilder()
+            .setProvider(Tracing.Http.newBuilder()
+                .setName("envoy.tracers.zipkin")
+                .setTypedConfig(Any.pack(zipkinConfig))))
         .setRouteConfig(getRouteConfiguration(clusters))
         .addHttpFilters(HttpFilter.newBuilder()
             .setName("envoy.filters.http.router")).build();
+
         return Listener.newBuilder()
             .setName("listener_0")
             .setAddress(Address.newBuilder()
@@ -98,11 +116,20 @@ public class EndPointDaoV3 {
           .setRoute(RouteAction.newBuilder()
               .setCluster(cluster.getName())).build();
     }).collect(toList());
+
     return RouteConfiguration.newBuilder()
         .setName("local_route")
         .addVirtualHosts(VirtualHost.newBuilder()
             .setName("all")
             .addDomains("*")
-            .addAllRoutes(routes)).build();
+            .addAllRoutes(routes)
+        .addAllResponseHeadersToAdd(getResponseHeaders())).build();
+  }
+
+  public List<HeaderValueOption> getResponseHeaders(){
+    List<HeaderValueOption> headers = new ArrayList<>();
+    headers.add(HeaderValueOption.newBuilder().setHeader(HeaderValue.newBuilder().setKey("x-b3-traceid").setValue("%REQ(x-b3-traceid)%")).build());
+    headers.add(HeaderValueOption.newBuilder().setHeader(HeaderValue.newBuilder().setKey("x-request-id").setValue("%REQ(x-request-id)%")).build());
+    return headers;
   }
 }
