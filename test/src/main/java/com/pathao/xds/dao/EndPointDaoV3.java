@@ -3,13 +3,11 @@ package com.pathao.xds.dao;
 import com.google.protobuf.Any;
 import com.google.protobuf.BoolValue;
 import com.google.protobuf.Duration;
+import com.google.protobuf.UInt32Value;
 import com.orbitz.consul.AgentClient;
 import com.pathao.xds.dto.ClusterDto;
 import io.envoyproxy.envoy.config.cluster.v3.Cluster;
-import io.envoyproxy.envoy.config.core.v3.Address;
-import io.envoyproxy.envoy.config.core.v3.HeaderValue;
-import io.envoyproxy.envoy.config.core.v3.HeaderValueOption;
-import io.envoyproxy.envoy.config.core.v3.SocketAddress;
+import io.envoyproxy.envoy.config.core.v3.*;
 import io.envoyproxy.envoy.config.endpoint.v3.ClusterLoadAssignment;
 import io.envoyproxy.envoy.config.endpoint.v3.Endpoint;
 import io.envoyproxy.envoy.config.endpoint.v3.LbEndpoint;
@@ -17,9 +15,11 @@ import io.envoyproxy.envoy.config.endpoint.v3.LocalityLbEndpoints;
 import io.envoyproxy.envoy.config.listener.v3.Filter;
 import io.envoyproxy.envoy.config.listener.v3.FilterChain;
 import io.envoyproxy.envoy.config.listener.v3.Listener;
+import io.envoyproxy.envoy.config.ratelimit.v3.RateLimitServiceConfig;
 import io.envoyproxy.envoy.config.route.v3.*;
 import io.envoyproxy.envoy.config.trace.v3.Tracing;
 import io.envoyproxy.envoy.config.trace.v3.ZipkinConfig;
+import io.envoyproxy.envoy.extensions.filters.http.ratelimit.v3.RateLimit;
 import io.envoyproxy.envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager;
 import io.envoyproxy.envoy.extensions.filters.network.http_connection_manager.v3.HttpFilter;
 
@@ -81,7 +81,16 @@ public class EndPointDaoV3 {
                 .setCollectorCluster("zipkin")
                 .setCollectorEndpoint("/api/v2/spans")
                 .setCollectorEndpointVersion(ZipkinConfig.CollectorEndpointVersion.HTTP_JSON).build();
-
+    RateLimit rateLimit = RateLimit.newBuilder()
+        .setDomain("rl")
+        .setRequestType("external")
+        .setStage(0)
+        .setRateLimitedAsResourceExhausted(true)
+        .setFailureModeDeny(false)
+        .setRateLimitService(RateLimitServiceConfig.newBuilder()
+            .setGrpcService(GrpcService.newBuilder()
+                .setEnvoyGrpc(GrpcService.EnvoyGrpc.newBuilder()
+                    .setClusterName("ratelimit_cluster")))).build();
     HttpConnectionManager manager = HttpConnectionManager.newBuilder()
         .setCodecType(HttpConnectionManager.CodecType.AUTO)
         .setStatPrefix("http")
@@ -92,7 +101,11 @@ public class EndPointDaoV3 {
                 .setTypedConfig(Any.pack(zipkinConfig))))
         .setRouteConfig(getRouteConfiguration(clusters))
         .addHttpFilters(HttpFilter.newBuilder()
-            .setName("envoy.filters.http.router")).build();
+            .setName("envoy.filters.http.ratelimit")
+            .setTypedConfig(Any.pack(rateLimit)))
+        .addHttpFilters(HttpFilter.newBuilder()
+            .setName("envoy.filters.http.router"))
+        .build();
 
         return Listener.newBuilder()
             .setName("listener_0")
@@ -114,7 +127,16 @@ public class EndPointDaoV3 {
           .setMatch(RouteMatch.newBuilder()
               .setPrefix("/" + cluster.getName() + "/"))
           .setRoute(RouteAction.newBuilder()
-              .setCluster(cluster.getName())).build();
+              .setCluster(cluster.getName()).addRateLimits(io.envoyproxy.envoy.config.route.v3.RateLimit.newBuilder()
+                  .setStage(UInt32Value.of(0))
+                  .addActions(io.envoyproxy.envoy.config.route.v3.RateLimit.Action.newBuilder()
+                      .setGenericKey(io.envoyproxy.envoy.config.route.v3.RateLimit.Action.GenericKey.newBuilder()
+                          .setDescriptorKey("path").
+                              setDescriptorValue(cluster.getName())))
+                  .addActions(io.envoyproxy.envoy.config.route.v3.RateLimit.Action.newBuilder()
+                      .setRequestHeaders(io.envoyproxy.envoy.config.route.v3.RateLimit.Action.RequestHeaders.newBuilder()
+                          .setHeaderName("cookie")
+                          .setDescriptorKey("cookie"))))).build();
     }).collect(toList());
 
     return RouteConfiguration.newBuilder()

@@ -19,8 +19,11 @@ import io.envoyproxy.envoy.api.v2.route.Route;
 import io.envoyproxy.envoy.api.v2.route.RouteAction;
 import io.envoyproxy.envoy.api.v2.route.RouteMatch;
 import io.envoyproxy.envoy.api.v2.route.VirtualHost;
+import io.envoyproxy.envoy.config.core.v3.GrpcService;
 import io.envoyproxy.envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager;
 import io.envoyproxy.envoy.config.filter.network.http_connection_manager.v2.HttpFilter;
+import io.envoyproxy.envoy.config.ratelimit.v3.RateLimitServiceConfig;
+import io.envoyproxy.envoy.extensions.filters.http.ratelimit.v3.RateLimit;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -72,11 +75,25 @@ public class EndPointDao {
   }
 
   public Listener getListener(){
+    RateLimit rateLimit = RateLimit.newBuilder()
+        .setDomain("rl")
+        .setRequestType("external")
+        .setStage(0)
+        .setRateLimitedAsResourceExhausted(true)
+        .setFailureModeDeny(false)
+        .setRateLimitService(RateLimitServiceConfig.newBuilder()
+            .setGrpcService(GrpcService.newBuilder()
+                .setEnvoyGrpc(GrpcService.EnvoyGrpc.newBuilder()
+                    .setClusterName("ratelimit_cluster")))).build();
     HttpConnectionManager manager = HttpConnectionManager.newBuilder()
         .setCodecType(HttpConnectionManager.CodecType.AUTO)
         .setStatPrefix("http")
         .addHttpFilters(HttpFilter.newBuilder()
-            .setName("envoy.router")).build();
+            .setName("envoy.router"))
+        .addHttpFilters(HttpFilter.newBuilder()
+            .setName("envoy.filters.http.ratelimit")
+            .setTypedConfig(Any.pack(rateLimit)))
+        .build();
         return Listener.newBuilder()
             .setName("listener_0")
             .setAddress(Address.newBuilder()

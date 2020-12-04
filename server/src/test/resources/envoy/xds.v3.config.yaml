@@ -51,3 +51,18 @@ static_resources:
                     socket_address:
                       address: ifp3-dev1
                       port_value: 9411
+    - name: ratelimit_cluster
+      connect_timeout: 1s
+      type: strict_dns
+      lb_policy: round_robin
+      protocol_selection: USE_CONFIGURED_PROTOCOL
+      http2_protocol_options: { }
+      load_assignment:
+        cluster_name: ratelimit_cluster
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 8081
